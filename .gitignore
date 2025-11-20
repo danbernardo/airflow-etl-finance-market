@@ -1,0 +1,47 @@
+# Environment Variables (SENSITIVE - NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# Logs & Temporary Files
+logs/
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database & Data
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+*.csv
+
+# Docker
+docker-compose.override.yml
+
+# System
+.env.production
+secrets/
+*.key
+*.pem

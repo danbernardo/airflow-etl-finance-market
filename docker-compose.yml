@@ -1,0 +1,142 @@
+# ===== CONFIGURAÇÕES COMUNS DO AIRFLOW =====
+# Essas configurações são compartilhadas entre todos os serviços Airflow
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.5.0
+  restart: always
+  environment: &airflow-common-env
+    # Executor: LocalExecutor roda tasks sequencialmente (bom para dev/teste)
+    AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_CORE_EXECUTOR}
+    # Conexão ao banco de dados do Airflow (metastore)
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DATABASE_SQL_ALCHEMY_CONN}
+    # Chave de encriptação para dados sensíveis
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    # Diretório onde as DAGs estão armazenadas
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    # Não carrega exemplos padrão do Airflow (limpeza)
+    AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_CORE_LOAD_EXAMPLES}
+    # Chave secreta para sessões web
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+    # Conexão customizada ao data warehouse PostgreSQL
+    AIRFLOW_CONN_POSTGRES_DW: ${AIRFLOW_CONN_POSTGRES_DW}
+    # Upgrade automático do banco de dados Airflow
+    _AIRFLOW_DB_UPGRADE: ${_AIRFLOW_DB_UPGRADE}
+    # Criar usuário admin automaticamente
+    _AIRFLOW_WWW_USER_CREATE: ${_AIRFLOW_WWW_USER_CREATE}
+    # Credenciais do usuário admin (via .env)
+    _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_WWW_USER_USERNAME}
+    _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_WWW_USER_PASSWORD}
+    _AIRFLOW_WWW_USER_EMAIL: ${AIRFLOW_WWW_USER_EMAIL}
+    _AIRFLOW_WWW_USER_FIRSTNAME: ${AIRFLOW_WWW_USER_FIRSTNAME}
+    _AIRFLOW_WWW_USER_LASTNAME: ${AIRFLOW_WWW_USER_LASTNAME}
+  volumes:
+    # DAGs: código dos pipelines (mount em tempo real para dev)
+    - ./dags:/opt/airflow/dags
+    # Logs: registro de execução das tasks
+    - ./logs:/opt/airflow/logs
+    # Arquivo CSV: input do pipeline (750K registros)
+    - ./financial_market_750k.csv:/opt/airflow/data/financial_market_750k.csv
+  networks:
+    airflow:
+      aliases:
+        - airflow
+  # Espera o PostgreSQL estar saudável antes de iniciar Airflow
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+# ===== DEFINIÇÃO DOS SERVIÇOS =====
+
+services:
+  # PostgreSQL: Data Warehouse + Metastore do Airflow
+  postgres:
+    image: postgres:13
+    container_name: airflow-postgres
+    hostname: postgres
+    restart: always
+    environment:
+      # Usuário e senha via .env (variáveis seguras)
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Banco principal onde rodam as queries do pipeline
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      # Dados persistidos em volume Docker (não se perde com `docker compose down`)
+      - postgres_data:/var/lib/postgresql/data
+      # Scripts SQL iniciais (create database, tabelas, etc)
+      - ./sql:/docker-entrypoint-initdb.d
+    ports:
+      # Expõe PostgreSQL na porta 55432 (evita conflito com PG local na 5432)
+      - "55432:5432"
+    # Health check: garante que PG está pronto antes de Airflow conectar
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
+      timeout: 5s
+    networks:
+      airflow:
+        aliases:
+          - postgres
+
+  # Serviço de inicialização: roda uma vez para setup
+  airflow-init:
+    <<: *airflow-common
+    restart: "no"
+    entrypoint: /bin/bash
+    # Executa upgrade do BD e cria conexão PostgreSQL (via variáveis de ambiente)
+    command: -c "airflow db upgrade && airflow connections add postgres_dw --conn-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/financial_dw || true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Webserver: Interface web do Airflow (http://localhost:58080)
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    hostname: airflow-webserver
+    command: webserver
+    # Expõe Airflow UI na porta 58080
+    ports:
+      - "58080:8080"
+    # Health check: monitora se webserver está respondendo
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      airflow:
+        aliases:
+          - airflow-webserver
+
+  # Scheduler: executa DAGs conforme schedule (ex: diariamente às 7h)
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    hostname: airflow-scheduler
+    command: scheduler
+    # Health check: verifica se scheduler está ativo
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob", "--limit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      airflow:
+        aliases:
+          - airflow-scheduler
+
+# ===== VOLUMES E REDES =====
+
+volumes:
+  # Volume persistente para dados do PostgreSQL
+  postgres_data:
+  # Volume para logs do Airflow
+  logs:
+
+networks:
+  # Rede Docker customizada para comunicação entre containers
+  airflow:
+    driver: bridge
