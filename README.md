@@ -345,7 +345,5 @@ Remove-Item -Path "logs/*" -Recurse -Force
 # Ou ao parar os containers
 docker compose down -v
 ```
-=======
-# airflow-etl-finance-market
-Pipeline ETL Mercado Financeiro com Airflow, Pandas e PostgreSQL — Exemplo didático.
->>>>>>> be23e7ccd61027f8f4b51f2438789b68f08a856b
+
+
