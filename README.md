@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Pipeline ETL de Análise de Volatilidade Financeira
 
 Pipeline de dados em produção que processa 750 mil registros de cotações financeiras através de uma arquitetura Medallion (Bronze → Silver → Gold). Implementa orquestração robusta com Apache Airflow, data warehouse normalizado em PostgreSQL e Star Schema otimizado para analytics.
@@ -344,3 +345,7 @@ Remove-Item -Path "logs/*" -Recurse -Force
 # Ou ao parar os containers
 docker compose down -v
 ```
+=======
+# airflow-etl-finance-market
+Pipeline ETL Mercado Financeiro com Airflow, Pandas e PostgreSQL — Exemplo didático.
+>>>>>>> be23e7ccd61027f8f4b51f2438789b68f08a856b
