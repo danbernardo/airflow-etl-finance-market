@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Pipeline ETL de Análise de Volatilidade Financeira
 
 Pipeline de dados em produção que processa 750 mil registros de cotações financeiras através de uma arquitetura Medallion (Bronze → Silver → Gold). Implementa orquestração robusta com Apache Airflow, data warehouse normalizado em PostgreSQL e Star Schema otimizado para analytics.
